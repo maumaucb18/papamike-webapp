@@ -1,5 +1,5 @@
 const ADMIN_PASS = "1234";
-        const WHATSAPP_NUMBER = "+5551992526332"; // COLOQUE O NUMERO DA EMPRESA AQUI
+        const WHATSAPP_NUMBER = "+5551991138469"; // COLOQUE O NUMERO DA EMPRESA AQUI
         
         let products = JSON.parse(localStorage.getItem('products')) || [
             { name: "Camiseta Algodão", price: 49.90 },
