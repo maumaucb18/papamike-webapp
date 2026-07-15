@@ -1,18 +1,75 @@
 const ADMIN_PASS = "1234";
-        const WHATSAPP_NUMBER = "+5551991138469"; // COLOQUE O NUMERO DA EMPRESA AQUI
-        
-        let products = JSON.parse(localStorage.getItem('products')) || [
-            { name: "Camiseta Algodão", price: 49.90 },
-            { name: "Camiseta Dry Fit", price: 59.90 }
-        ];
-        
-        let cart = [];
+const WHATSAPP_NUMBER = "+5551991138469"; // COLOQUE O NUMERO DA EMPRESA AQUI
+
+// Se existir, `js/supabase-config.js` pode definir SUPABASE_URL e SUPABASE_ANON_KEY.
+// Caso não configure, o app usa localStorage como fallback.
+let products = JSON.parse(localStorage.getItem('products')) || [
+    { name: "Camiseta Algodão", price: 49.90 },
+    { name: "Camiseta Dry Fit", price: 59.90 }
+];
+
+let cart = [];
+
+const usingSupabase = typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL && typeof SUPABASE_ANON_KEY !== 'undefined' && SUPABASE_ANON_KEY;
+
+async function fetchProductsFromSupabase() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=*`, {
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+            }
+        });
+        if (!res.ok) throw new Error('Failed to fetch');
+        const data = await res.json();
+        // Espera objetos com { id, name, price }
+        products = data.map(p => ({ id: p.id, name: p.name, price: parseFloat(p.price) }));
+        renderProducts();
+        renderAdminList();
+    } catch (err) {
+        console.error('Supabase fetch error:', err);
+        // fallback automático permanece com localStorage
+    }
+}
+
+async function addProductToSupabase(name, price) {
+    const body = [{ name, price }];
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/products`, {
+        method: 'POST',
+        headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}` ,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation'
+        },
+        body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error('Failed to add product');
+    const created = await res.json();
+    return created[0];
+}
+
+async function deleteProductFromSupabase(id) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/products?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+        }
+    });
+    if (!res.ok) throw new Error('Failed to delete product');
+}
 
         // --- Inicialização ---
-        function init() {
-            renderProducts();
-            renderCart();
-        }
+function init() {
+    if (usingSupabase) {
+        fetchProductsFromSupabase();
+    } else {
+        renderProducts();
+        renderAdminList();
+    }
+    renderCart();
+}
 
         // --- Gestão de Produtos (Admin) ---
         function openAdmin() {
@@ -29,40 +86,67 @@ const ADMIN_PASS = "1234";
             document.getElementById('modal-admin').classList.add('hidden');
         }
 
-        function saveProduct() {
-            const name = document.getElementById('new-prod-name').value;
-            const price = parseFloat(document.getElementById('new-prod-price').value);
-            if (!name || isNaN(price)) return alert("Dados inválidos");
-            
-            products.push({ name, price });
-            localStorage.setItem('products', JSON.stringify(products));
-            renderProducts();
-            renderAdminList();
-            document.getElementById('new-prod-name').value = '';
-            document.getElementById('new-prod-price').value = '';
-        }
+async function saveProduct() {
+    const name = document.getElementById('new-prod-name').value;
+    const price = parseFloat(document.getElementById('new-prod-price').value);
+    if (!name || isNaN(price)) return alert("Dados inválidos");
 
-        function deleteProduct(index) {
+    if (usingSupabase) {
+        try {
+            const created = await addProductToSupabase(name, price);
+            products.push({ id: created.id, name: created.name, price: parseFloat(created.price) });
+        } catch (err) {
+            alert('Erro ao adicionar no Supabase');
+            console.error(err);
+            return;
+        }
+    } else {
+        products.push({ name, price });
+        localStorage.setItem('products', JSON.stringify(products));
+    }
+
+    renderProducts();
+    renderAdminList();
+    document.getElementById('new-prod-name').value = '';
+    document.getElementById('new-prod-price').value = '';
+}
+
+async function deleteProduct(index) {
+    const prod = products[index];
+    if (!prod) return;
+
+    if (usingSupabase && prod.id) {
+        try {
+            await deleteProductFromSupabase(prod.id);
             products.splice(index, 1);
-            localStorage.setItem('products', JSON.stringify(products));
-            renderProducts();
-            renderAdminList();
+        } catch (err) {
+            alert('Erro ao excluir no Supabase');
+            console.error(err);
+            return;
         }
+    } else {
+        products.splice(index, 1);
+        localStorage.setItem('products', JSON.stringify(products));
+    }
 
-        function renderProducts() {
-            const select = document.getElementById('select-product');
-            select.innerHTML = products.map(p => `<option value="${p.name}">${p.name} - R$ ${p.price.toFixed(2)}</option>`).join('');
-        }
+    renderProducts();
+    renderAdminList();
+}
 
-        function renderAdminList() {
-            const list = document.getElementById('admin-prod-list');
-            list.innerHTML = products.map((p, i) => `
-                <div class="flex justify-between py-1 border-b border-white/5">
-                    <span>${p.name}</span>
-                    <button onclick="deleteProduct(${i})" class="text-red-500">Excluir</button>
-                </div>
-            `).join('');
-        }
+function renderProducts() {
+    const select = document.getElementById('select-product');
+    select.innerHTML = products.map(p => `<option value="${p.name}">${p.name} - R$ ${p.price.toFixed(2)}</option>`).join('');
+}
+
+function renderAdminList() {
+    const list = document.getElementById('admin-prod-list');
+    list.innerHTML = products.map((p, i) => `
+        <div class="flex justify-between py-1 border-b border-white/5">
+            <span>${p.name} - R$ ${p.price.toFixed(2)}</span>
+            <button onclick="deleteProduct(${i})" class="text-red-500">Excluir</button>
+        </div>
+    `).join('');
+}
 
         // --- Carrinho / Lista ---
         function addToList() {
