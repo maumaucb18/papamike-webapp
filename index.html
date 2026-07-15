@@ -8,17 +8,39 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/main.css">
-    
-</head>
-<body class="min-h-screen flex items-center justify-center p-4">
-    
-    
-    <main class="w-full max-w-md">
+        <style>
+            /* Logo: evitar esticamento — largura limitada, altura automática */
+            .logo-wrapper{display:flex;align-items:center;justify-content:center;padding:6px 0}
+            /* Ícone pequeno */
+            .logo-img{width:48px;max-width:48px;height:auto;max-height:48px;object-fit:contain;display:block}
+            /* Logo fora do card (tamanho solicitado) */
+            .logo-outside{width:160px;height:160px;object-fit:contain;display:block}
 
-       <header class="flex justify-center mb-4 sm:mb-6"> 
-    <img src="img/papamike logo.webp" alt="Logo PAPA MIKE" class="mx-auto rounded-xl w-24 sm:w-28 md:w-32 h-auto object-cover"> 
-  </header> 
-        <div class="rounded-2xl p-6 shadow-2xl border border-white/10 panel-bg">
+            /* Fallback imediato para as classes Tailwind do <body> */
+            body{
+                min-height:100vh;
+                color:#f1f5f9; /* text-slate-100 */
+                padding:1rem; /* p-4 */
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                justify-content:flex-start;
+                background-color:#0f1724; /* bg-slate-950-ish */
+                font-family: 'DM Sans', sans-serif;
+            }
+            @media (min-width: 768px){
+                body{padding-top:2rem;padding-bottom:2rem} /* md:py-8 */
+            }
+            ::selection{background:#10b981;color:#0f1724} /* selection:bg-emerald-500 selection:text-slate-950 */
+        </style>
+
+</head>
+<body class="min-h-screen text-slate-100 p-4 md:py-8 flex flex-col items-center justify-start bg-slate-950 font-sans selection:bg-emerald-500 selection:text-slate-950">
+    <main class="w-full max-w-xl">
+        <div class="flex justify-center mb-4">
+            <img src="img/papamike logo.png" alt="Logo PAPA MIKE" class="logo-outside rounded-3xl shadow-2xl border border-white/10">
+        </div>
+        <div class="rounded-3xl p-6 shadow-2xl border border-white/10 panel-bg">
             
             <div class="flex justify-between items-center mb-6">
                 
@@ -30,8 +52,7 @@
                     </button>
                 </div>
             </div>
-            <div id="supabase-status" class="mb-2 text-sm text-gray-300"></div>
-            <div id="data-source" class="mb-4 text-xs text-gray-400"></div>
+            <div id="supabase-status" class="mb-2 text-sm text-gray-300 hidden"></div>
             
             <!-- Telefone Contato -->
             <div class="mb-4">
@@ -82,15 +103,23 @@
     <!-- Modal Admin -->
     <div id="modal-admin" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4 z-50">
         <div class="bg-gray-900 border border-white/20 p-6 rounded-2xl w-full max-w-sm">
-            <h2 class="text-white font-bold text-xl mb-4 text-center">Gerenciar Produtos</h2>
-            <div id="admin-mode" class="mb-3 text-xs text-gray-400"></div>
-            <div class="space-y-3">
-                <input id="new-prod-name" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Nome do Produto">
-                <input id="new-prod-price" type="number" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Preço (Ex: 55.00)">
-                <button onclick="saveProduct()" class="w-full bg-blue-600 text-white py-2 rounded font-bold">Adicionar Produto</button>
+            <h2 class="text-white font-bold text-xl mb-4 text-center">Área Administrativa</h2>
+            <div id="admin-login-pane" class="space-y-3">
+                <input id="admin-password" type="password" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Senha administrativa">
+                <div id="admin-login-error" class="text-xs text-red-400 hidden"></div>
+                <button onclick="loginAdmin()" class="w-full bg-blue-600 text-white py-2 rounded font-bold">Entrar</button>
             </div>
-            <div id="admin-prod-list" class="mt-4 max-h-40 overflow-y-auto border-t border-white/10 pt-2 text-sm text-white">
-                <!-- Lista de exclusão -->
+            <div id="admin-content-pane" class="hidden">
+                <div id="admin-mode" class="mb-3 text-xs text-gray-400"></div>
+                <div class="space-y-3">
+                    <input id="new-prod-name" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Nome do Produto">
+                    <input id="new-prod-price" type="number" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Preço (Ex: 55.00)">
+                    <button onclick="saveProduct()" class="w-full bg-blue-600 text-white py-2 rounded font-bold">Adicionar Produto</button>
+                </div>
+                <div id="admin-prod-list" class="mt-4 max-h-40 overflow-y-auto border-t border-white/10 pt-2 text-sm text-white">
+                    <!-- Lista de exclusão -->
+                </div>
+                <button onclick="logoutAdmin()" class="w-full mt-4 bg-red-600 text-white py-2 rounded font-bold">Sair</button>
             </div>
             <button onclick="closeAdmin()" class="w-full mt-4 text-gray-400 text-sm">Fechar</button>
         </div>

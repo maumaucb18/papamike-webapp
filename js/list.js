@@ -1,4 +1,4 @@
-const ADMIN_PASS = "1234";
+const ADMIN_PASS_HASH = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4';
 const WHATSAPP_NUMBER = "+5551991138469"; // COLOQUE O NUMERO DA EMPRESA AQUI
 
 // Se existir, `js/supabase-config.js` pode definir SUPABASE_URL e SUPABASE_ANON_KEY.
@@ -15,14 +15,20 @@ const usingSupabase = typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL && typ
 function setStatus(message, type = 'info') {
     const status = document.getElementById('supabase-status');
     if (!status) return;
+    if (type === 'hidden') {
+        status.textContent = '';
+        status.className = 'hidden';
+        return;
+    }
     status.textContent = message;
     status.className = 'mb-4 text-sm ' + (type === 'error' ? 'text-red-400' : type === 'success' ? 'text-green-300' : 'text-gray-300');
 }
 
-function setDataSource(message) {
-    const source = document.getElementById('data-source');
-    if (!source) return;
-    source.textContent = message;
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function setAdminModeHint() {
@@ -42,7 +48,6 @@ function refreshProducts() {
 }
 
 async function fetchProductsFromSupabase() {
-    setStatus('Conectando ao Supabase...');
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=*`, {
             headers: {
@@ -60,10 +65,10 @@ async function fetchProductsFromSupabase() {
         renderProducts();
         renderAdminList();
 
-        if (products.length > 0) {
-            setStatus(`Sucesso! ${products.length} produto(s) carregado(s) do Supabase.`, 'success');
+        if (products.length === 0) {
+            setStatus('Tabela `products` vazia no Supabase.', 'info');
         } else {
-            setStatus('Conectado ao Supabase, mas não existem produtos na tabela `products`.', 'info');
+            setStatus('', 'hidden');
         }
     } catch (err) {
         console.error('Supabase fetch error:', err);
@@ -104,7 +109,7 @@ async function deleteProductFromSupabase(id) {
 // --- Inicialização ---
 function init() {
     setAdminModeHint();
-    setDataSource(usingSupabase ? 'Dados vindos do Supabase.' : 'Dados vindos do localStorage.');
+    setStatus('', 'hidden');
     if (usingSupabase) {
         fetchProductsFromSupabase();
     } else {
@@ -115,43 +120,81 @@ function init() {
 }
 
         // --- Gestão de Produtos (Admin) ---
-        function openAdmin() {
-            const pass = prompt("Digite a senha administrativa:");
-            if (pass === ADMIN_PASS) {
-                document.getElementById('modal-admin').classList.remove('hidden');
-                renderAdminList();
-            } else {
-                alert("Senha incorreta!");
-            }
-        }
+        async function loginAdmin() {
+    const passInput = document.getElementById('admin-password');
+    const error = document.getElementById('admin-login-error');
+    if (!passInput || !error) return;
 
-        function closeAdmin() {
-            document.getElementById('modal-admin').classList.add('hidden');
-        }
+    const pass = passInput.value.trim();
+    if (!pass) {
+        error.textContent = 'Informe a senha administrativa.';
+        error.classList.remove('hidden');
+        return;
+    }
+
+    const hashed = await sha256(pass);
+    if (hashed !== ADMIN_PASS_HASH) {
+        error.textContent = 'Senha incorreta!';
+        error.classList.remove('hidden');
+        passInput.value = '';
+        return;
+    }
+
+    error.textContent = '';
+    error.classList.add('hidden');
+    passInput.value = '';
+    document.getElementById('admin-login-pane').classList.add('hidden');
+    document.getElementById('admin-content-pane').classList.remove('hidden');
+    document.getElementById('modal-admin').classList.remove('hidden');
+    setAdminModeHint();
+    renderAdminList();
+}
+
+function openAdmin() {
+    document.getElementById('modal-admin').classList.remove('hidden');
+    document.getElementById('admin-login-pane').classList.remove('hidden');
+    document.getElementById('admin-content-pane').classList.add('hidden');
+    document.getElementById('admin-login-error').classList.add('hidden');
+}
+
+function logoutAdmin() {
+    document.getElementById('admin-login-pane').classList.remove('hidden');
+    document.getElementById('admin-content-pane').classList.add('hidden');
+    document.getElementById('modal-admin').classList.remove('hidden');
+}
+
+function closeAdmin() {
+    document.getElementById('modal-admin').classList.add('hidden');
+}
 
 async function saveProduct() {
-    const name = document.getElementById('new-prod-name').value;
-    const price = parseFloat(document.getElementById('new-prod-price').value);
+    const nameEl = document.getElementById('new-prod-name');
+    const priceEl = document.getElementById('new-prod-price');
+    const name = nameEl.value.trim();
+    const price = parseFloat(priceEl.value);
     if (!name || isNaN(price)) return alert("Dados inválidos");
 
     if (usingSupabase) {
         try {
             const created = await addProductToSupabase(name, price);
             products.push({ id: created.id, name: created.name, price: parseFloat(created.price) });
+            setStatus('Produto adicionado com sucesso.', 'success');
         } catch (err) {
             alert('Erro ao adicionar no Supabase');
             console.error(err);
+            setStatus(`Erro ao adicionar produto: ${err.message}`, 'error');
             return;
         }
     } else {
         products.push({ name, price });
         localStorage.setItem('products', JSON.stringify(products));
+        setStatus('Produto adicionado ao localStorage.', 'success');
     }
 
     renderProducts();
     renderAdminList();
-    document.getElementById('new-prod-name').value = '';
-    document.getElementById('new-prod-price').value = '';
+    nameEl.value = '';
+    priceEl.value = '';
 }
 
 async function deleteProduct(index) {
