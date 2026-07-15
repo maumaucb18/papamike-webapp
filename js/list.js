@@ -12,7 +12,37 @@ let cart = [];
 
 const usingSupabase = typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL && typeof SUPABASE_ANON_KEY !== 'undefined' && SUPABASE_ANON_KEY;
 
+function setStatus(message, type = 'info') {
+    const status = document.getElementById('supabase-status');
+    if (!status) return;
+    status.textContent = message;
+    status.className = 'mb-4 text-sm ' + (type === 'error' ? 'text-red-400' : type === 'success' ? 'text-green-300' : 'text-gray-300');
+}
+
+function setDataSource(message) {
+    const source = document.getElementById('data-source');
+    if (!source) return;
+    source.textContent = message;
+}
+
+function setAdminModeHint() {
+    const adminMode = document.getElementById('admin-mode');
+    if (!adminMode) return;
+    adminMode.textContent = usingSupabase ? 'Admin em modo Supabase: alterações salvam no banco.' : 'Admin em modo local: alterações salvam no localStorage.';
+}
+
+function refreshProducts() {
+    if (usingSupabase) {
+        fetchProductsFromSupabase();
+    } else {
+        renderProducts();
+        renderAdminList();
+        setStatus('Atualizado a partir do localStorage.', 'success');
+    }
+}
+
 async function fetchProductsFromSupabase() {
+    setStatus('Conectando ao Supabase...');
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=*`, {
             headers: {
@@ -20,15 +50,26 @@ async function fetchProductsFromSupabase() {
                 Authorization: `Bearer ${SUPABASE_ANON_KEY}`
             }
         });
-        if (!res.ok) throw new Error('Failed to fetch');
+        if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(`${res.status} ${res.statusText} - ${errorText}`);
+        }
+
         const data = await res.json();
-        // Espera objetos com { id, name, price }
         products = data.map(p => ({ id: p.id, name: p.name, price: parseFloat(p.price) }));
         renderProducts();
         renderAdminList();
+
+        if (products.length > 0) {
+            setStatus(`Sucesso! ${products.length} produto(s) carregado(s) do Supabase.`, 'success');
+        } else {
+            setStatus('Conectado ao Supabase, mas não existem produtos na tabela `products`.', 'info');
+        }
     } catch (err) {
         console.error('Supabase fetch error:', err);
-        // fallback automático permanece com localStorage
+        setStatus(`Erro ao conectar no Supabase: ${err.message}`, 'error');
+        renderProducts();
+        renderAdminList();
     }
 }
 
@@ -60,8 +101,10 @@ async function deleteProductFromSupabase(id) {
     if (!res.ok) throw new Error('Failed to delete product');
 }
 
-        // --- Inicialização ---
+// --- Inicialização ---
 function init() {
+    setAdminModeHint();
+    setDataSource(usingSupabase ? 'Dados vindos do Supabase.' : 'Dados vindos do localStorage.');
     if (usingSupabase) {
         fetchProductsFromSupabase();
     } else {

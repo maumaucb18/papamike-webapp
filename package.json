@@ -1,5 +1,13 @@
 {
+  "name": "papamike-webapp",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./css/src.css -o ./css/main.css --minify"
+  },
   "dependencies": {
     "@supabase/server": "^1.4.0"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
   }
 }

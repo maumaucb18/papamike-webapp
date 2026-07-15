@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos personalizados abaixo */
+body {
+  background: linear-gradient(135deg, #000000, #374151, #9ca3af);
+  font-family: 'DM Sans', sans-serif;
+}
+.panel-bg {
+  background: linear-gradient(160deg, #111827, #1f2937, #4b5563);
+}
+.btn-hover:hover {
+  transform: scale(1.02);
+  filter: brightness(1.2);
+}
+.btn-hover {
+  transition: all 0.2s;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 10px;
+}
+
+/* Cabeçalho */
+.app-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 14px 20px;
+  width: 100%;
+}
+
+/* Logo Responsivo */
+header img.logo-app {
+  width: 100%;
+  max-width: 180px;
+  min-width: 90px;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  transition: 0.3s ease;
+}
+
+@media (min-width: 768px) {
+  header img.logo-app {
+    max-width: 220px;
+    min-width: 120px;
+  }
+}
