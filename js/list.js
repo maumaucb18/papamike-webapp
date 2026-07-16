@@ -151,13 +151,13 @@ function init() {
         productsTab.addEventListener('click', () => activateAdminTab('products'));
         securityTab.addEventListener('click', () => activateAdminTab('security'));
     }
-    // Sanitiza e limita o campo de telefone para 9 dígitos
+    // Sanitiza e limita o campo de telefone para 11 dígitos
     const phoneInput = document.getElementById('contact-phone');
     if (phoneInput) {
-        phoneInput.setAttribute('maxlength', '9');
+        phoneInput.setAttribute('maxlength', '11');
         phoneInput.setAttribute('inputmode', 'numeric');
         phoneInput.addEventListener('input', (e) => {
-            const cleaned = e.target.value.replace(/\D/g, '').slice(0, 9);
+            const cleaned = e.target.value.replace(/\D/g, '').slice(0, 11);
             if (e.target.value !== cleaned) e.target.value = cleaned;
         });
     }
@@ -364,7 +364,7 @@ function renderCart() {
 function preSendCheck() {
     const raw = document.getElementById('contact-phone').value;
     const phone = raw.replace(/\D/g, '');
-    if (!phone || phone.length !== 9) return alert("Por favor, informe o telefone de contato com 9 dígitos.");
+    if (!phone || phone.length !== 11) return alert("Por favor, informe o telefone de contato com 11 dígitos.");
     if (cart.length === 0) return alert("Sua lista está vazia.");
 
     const confirmacao = confirm(
