@@ -1,5 +1,47 @@
 {
 "name":"Papa Mike","short_name":"PapaMike","start_url":"/","display":"standalone",
+"description":"App Papa Mike para fazer pedidos rapidamente",
 "background_color":"#111827","theme_color":"#111827",
-"icons":[{"src":"img/icon-192.png","sizes":"192x192","type":"image/png"},{"src":"img/icon-512.png","sizes":"512x512","type":"image/png"}]
+"protocol_handlers":[
+  {
+    "protocol":"web+papamike",
+    "url":"/pedido?uri=%s"
+  }
+],
+  "orientation": "portrait",
+  "shortcuts": [
+    {
+      "name": "Fazer pedido",
+      "short_name": "Pedido",
+      "url": "/pedido",
+      "description": "Acesse rapidamente a página de pedidos",
+      "icons": [
+        {
+          "src": "img/icon-96x96.png",
+          "type": "image/png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "img/screenshot-1.png",
+      "type": "image/png",
+      "sizes": "640x360"
+    }
+  ],
+  "icons": [
+    {
+      "src": "img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "display_override": ["fullscreen", "standalone"]
 }
