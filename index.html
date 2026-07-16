@@ -107,7 +107,10 @@
             <div id="admin-login-pane" class="space-y-3">
                 <input id="admin-password" type="password" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Senha administrativa">
                 <div id="admin-login-error" class="text-xs text-red-400 hidden"></div>
-                <button onclick="loginAdmin()" class="w-full bg-blue-600 text-white py-2 rounded font-bold">Entrar</button>
+                <div class="flex gap-2">
+                    <button onclick="loginAdmin()" class="flex-1 bg-blue-600 text-white py-2 rounded font-bold">Entrar</button>
+                    <button onclick="openRecovery()" class="flex-1 bg-amber-500 text-black py-2 rounded font-bold">Recuperar</button>
+                </div>
             </div>
             <div id="admin-content-pane" class="hidden">
                 <div id="admin-mode" class="mb-3 text-xs text-gray-400"></div>
@@ -115,6 +118,29 @@
                     <input id="new-prod-name" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Nome do Produto">
                     <input id="new-prod-price" type="number" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Preço (Ex: 55.00)">
                     <button onclick="saveProduct()" class="w-full bg-blue-600 text-white py-2 rounded font-bold">Adicionar Produto</button>
+                </div>
+                <div class="mt-4 border-t border-white/10 pt-3 space-y-3">
+                    <h3 class="text-sm text-white font-bold">Segurança</h3>
+                    <div class="text-xs text-gray-300">Alterar senha administrativa</div>
+                    <input id="current-pass" type="password" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Senha atual">
+                    <input id="new-pass" type="password" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Nova senha">
+                    <input id="confirm-pass" type="password" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Confirme a nova senha">
+                    <button onclick="changeAdminPassword()" class="w-full bg-emerald-500 text-black py-2 rounded font-bold">Alterar senha</button>
+
+                    <div class="pt-2">
+                        <div class="text-xs text-gray-300">E-mail administrativo (usado para recuperação)</div>
+                        <div class="flex gap-2">
+                            <input id="admin-email" type="email" class="flex-1 rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="seu@email.com">
+                            <button onclick="saveAdminEmail()" class="bg-blue-600 text-white px-3 rounded font-bold">Salvar</button>
+                        </div>
+                        <div id="admin-email-display" class="text-xs text-gray-400 mt-1"></div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button id="gen-recovery-btn" onclick="generateRecoveryCode()" class="w-full bg-gray-700 text-white py-2 rounded font-bold">Gerar código de recuperação</button>
+                        <button id="send-recovery-email-btn" onclick="sendRecoveryEmail()" class="w-full mt-2 bg-emerald-500 text-black py-2 rounded font-bold">Enviar código por e-mail</button>
+                        <div id="recovery-code-display" class="mt-2 text-xs text-gray-300 break-words"></div>
+                    </div>
                 </div>
                 <div id="admin-prod-list" class="mt-4 max-h-40 overflow-y-auto border-t border-white/10 pt-2 text-sm text-white">
                     <!-- Lista de exclusão -->

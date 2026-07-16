@@ -37,6 +37,101 @@ function setAdminModeHint() {
     adminMode.textContent = usingSupabase ? 'Admin em modo Supabase: alterações salvam no banco.' : 'Admin em modo local: alterações salvam no localStorage.';
 }
 
+// --- Admin password storage helpers ---
+function getStoredAdminHash() {
+    return localStorage.getItem('admin_pass_hash') || ADMIN_PASS_HASH;
+}
+
+function setStoredAdminHash(hash) {
+    localStorage.setItem('admin_pass_hash', hash);
+}
+
+function setStoredRecoveryHash(hash) {
+    localStorage.setItem('admin_recovery_hash', hash);
+}
+
+function getStoredRecoveryHash() {
+    return localStorage.getItem('admin_recovery_hash') || null;
+}
+
+// --- Admin email helpers ---
+function getAdminEmail() {
+    return localStorage.getItem('admin_email') || '';
+}
+
+function setAdminEmail(email) {
+    localStorage.setItem('admin_email', email);
+    const disp = document.getElementById('admin-email-display');
+    if (disp) disp.textContent = email ? 'E-mail salvo: ' + email : '';
+}
+
+function saveAdminEmail() {
+    const el = document.getElementById('admin-email');
+    if (!el) return;
+    const email = el.value.trim();
+    if (!email) return alert('Informe um e-mail válido.');
+    setAdminEmail(email);
+    alert('E-mail salvo. Códigos de recuperação poderão ser enviados para esse endereço.');
+}
+
+function updateAdminEmailDisplay() {
+    const email = getAdminEmail();
+    const disp = document.getElementById('admin-email-display');
+    const input = document.getElementById('admin-email');
+    if (disp) disp.textContent = email ? 'E-mail salvo: ' + email : '';
+    if (input) input.value = email || '';
+}
+
+async function generateRecoveryCode() {
+    const arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    const code = Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
+    const hash = await sha256(code);
+    setStoredRecoveryHash(hash);
+    try { sessionStorage.setItem('admin_recovery_code_plain', code); } catch (e) {}
+    const display = document.getElementById('recovery-code-display');
+    if (display) display.textContent = 'Código de recuperação gerado. Use "Enviar código por e-mail" ou copie-o: ' + code;
+}
+
+function sendRecoveryEmail() {
+    const email = getAdminEmail();
+    if (!email) return alert('Nenhum e-mail salvo. Cadastre um e-mail no painel administrativo.');
+    const code = sessionStorage.getItem('admin_recovery_code_plain');
+    if (!code) return alert('Nenhum código gerado. Gere um código antes de enviar.');
+    const subject = encodeURIComponent('Código de recuperação - PAPA MIKE');
+    const body = encodeURIComponent(`Olá,\n\nSegue o código de recuperação da senha administrativa:\n\n${code}\n\nUse este código na tela de recuperação para definir uma nova senha.\n\nSe você não solicitou este código, ignore esta mensagem.`);
+    const mailto = `mailto:${email}?subject=${subject}&body=${body}`;
+    window.open(mailto, '_blank');
+}
+
+async function recoverWithCode(code, newPass) {
+    const hash = await sha256(code);
+    const stored = getStoredRecoveryHash();
+    if (!stored) { alert('Nenhum código de recuperação registrado.'); return false; }
+    if (hash !== stored) { alert('Código de recuperação inválido.'); return false; }
+    const newHash = await sha256(newPass);
+    setStoredAdminHash(newHash);
+    setStoredRecoveryHash('');
+    return true;
+}
+
+async function changeAdminPassword() {
+    const current = document.getElementById('current-pass').value.trim();
+    const np = document.getElementById('new-pass').value.trim();
+    const conf = document.getElementById('confirm-pass').value.trim();
+    if (!current || !np || !conf) return alert('Preencha todos os campos.');
+    if (np !== conf) return alert('Confirmação não confere.');
+    const curHash = await sha256(current);
+    const stored = getStoredAdminHash();
+    if (curHash !== stored) return alert('Senha atual incorreta.');
+    const newHash = await sha256(np);
+    setStoredAdminHash(newHash);
+    alert('Senha alterada com sucesso.');
+    document.getElementById('current-pass').value='';
+    document.getElementById('new-pass').value='';
+    document.getElementById('confirm-pass').value='';
+}
+
 function refreshProducts() {
     if (usingSupabase) {
         fetchProductsFromSupabase();
@@ -55,6 +150,7 @@ async function fetchProductsFromSupabase() {
                 Authorization: `Bearer ${SUPABASE_ANON_KEY}`
             }
         });
+
         if (!res.ok) {
             const errorText = await res.text();
             throw new Error(`${res.status} ${res.statusText} - ${errorText}`);
@@ -119,8 +215,8 @@ function init() {
     renderCart();
 }
 
-        // --- Gestão de Produtos (Admin) ---
-        async function loginAdmin() {
+// --- Gestão de Produtos (Admin) ---
+async function loginAdmin() {
     const passInput = document.getElementById('admin-password');
     const error = document.getElementById('admin-login-error');
     if (!passInput || !error) return;
@@ -133,7 +229,8 @@ function init() {
     }
 
     const hashed = await sha256(pass);
-    if (hashed !== ADMIN_PASS_HASH) {
+    const storedHash = getStoredAdminHash();
+    if (hashed !== storedHash) {
         error.textContent = 'Senha incorreta!';
         error.classList.remove('hidden');
         passInput.value = '';
@@ -155,6 +252,7 @@ function openAdmin() {
     document.getElementById('admin-login-pane').classList.remove('hidden');
     document.getElementById('admin-content-pane').classList.add('hidden');
     document.getElementById('admin-login-error').classList.add('hidden');
+    updateAdminEmailDisplay();
 }
 
 function logoutAdmin() {
@@ -221,11 +319,13 @@ async function deleteProduct(index) {
 
 function renderProducts() {
     const select = document.getElementById('select-product');
+    if (!select) return;
     select.innerHTML = products.map(p => `<option value="${p.name}">${p.name} - R$ ${p.price.toFixed(2)}</option>`).join('');
 }
 
 function renderAdminList() {
     const list = document.getElementById('admin-prod-list');
+    if (!list) return;
     list.innerHTML = products.map((p, i) => `
         <div class="flex justify-between py-1 border-b border-white/5">
             <span>${p.name} - R$ ${p.price.toFixed(2)}</span>
@@ -234,101 +334,99 @@ function renderAdminList() {
     `).join('');
 }
 
-        // --- Carrinho / Lista ---
-        function addToList() {
-            const name = document.getElementById('input-name').value;
-            const prodName = document.getElementById('select-product').value;
-            const size = document.getElementById('select-size').value;
-            const qty = parseInt(document.getElementById('input-qty').value);
-            const product = products.find(p => p.name === prodName);
+// --- Carrinho / Lista ---
+function addToList() {
+    const name = document.getElementById('input-name').value;
+    const prodName = document.getElementById('select-product').value;
+    const size = document.getElementById('select-size').value;
+    const qty = parseInt(document.getElementById('input-qty').value);
+    const product = products.find(p => p.name === prodName);
 
-            if (!name) return alert("Preencha a escrita da estampa");
+    if (!name) return alert("Preencha a escrita da estampa");
 
-            cart.push({ 
-                estampa: name, 
-                produto: prodName, 
-                tamanho: size, 
-                quantidade: qty,
-                precoUnit: product.price,
-                total: product.price * qty
-            });
+    cart.push({ 
+        estampa: name, 
+        produto: prodName, 
+        tamanho: size, 
+        quantidade: qty,
+        precoUnit: product.price,
+        total: product.price * qty
+    });
 
-            renderCart();
-            document.getElementById('input-name').value = '';
-        }
+    renderCart();
+    document.getElementById('input-name').value = '';
+}
 
-        function removeFromCart(index) {
-            cart.splice(index, 1);
-            renderCart();
-        }
+function removeFromCart(index) {
+    cart.splice(index, 1);
+    renderCart();
+}
 
-        function renderCart() {
-            const container = document.getElementById('list-container');
-            let totalGeral = 0;
-            
-            container.innerHTML = cart.map((item, i) => {
-                totalGeral += item.total;
-                return `
-                <div class="bg-white/10 rounded-lg p-3 text-white flex justify-between items-center">
-                    <div>
-                        <p class="font-bold text-sm">${item.estampa}</p>
-                        <p class="text-xs text-gray-300">${item.quantidade}x ${item.produto} (${item.tamanho})</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-sm font-bold">R$ ${item.total.toFixed(2)}</p>
-                        <button onclick="removeFromCart(${i})" class="text-red-400 text-xs">Remover</button>
-                    </div>
-                </div>
-            `}).join('');
-            
-            document.getElementById('total-price').textContent = `Total: R$ ${totalGeral.toFixed(2)}`;
-        }
+function renderCart() {
+    const container = document.getElementById('list-container');
+    if (!container) return;
+    let totalGeral = 0;
+    
+    container.innerHTML = cart.map((item, i) => {
+        totalGeral += item.total;
+        return `
+        <div class="bg-white/10 rounded-lg p-3 text-white flex justify-between items-center">
+            <div>
+                <p class="font-bold text-sm">${item.estampa}</p>
+                <p class="text-xs text-gray-300">${item.quantidade}x ${item.produto} (${item.tamanho})</p>
+            </div>
+            <div class="text-right">
+                <p class="text-sm font-bold">R$ ${item.total.toFixed(2)}</p>
+                <button onclick="removeFromCart(${i})" class="text-red-400 text-xs">Remover</button>
+            </div>
+        </div>
+    `}).join('');
+    
+    const totalEl = document.getElementById('total-price');
+    if (totalEl) totalEl.textContent = `Total: R$ ${totalGeral.toFixed(2)}`;
+}
 
-        // --- Envio e Excel ---
-        function preSendCheck() {
-            const phone = document.getElementById('contact-phone').value;
-            if (!phone) return alert("Por favor, informe o telefone de contato.");
-            if (cart.length === 0) return alert("Sua lista está vazia.");
+// --- Envio e Excel ---
+function preSendCheck() {
+    const phone = document.getElementById('contact-phone').value;
+    if (!phone) return alert("Por favor, informe o telefone de contato.");
+    if (cart.length === 0) return alert("Sua lista está vazia.");
 
-            const confirmacao = confirm(
-                "ATENÇÃO E CONFERÊNCIA:\n\n" +
-                "Pedimos que confira com bastante atenção todas as informações do pedido, especialmente:\n" +
-                "Nomes (ortografia e acentuação)\n" +
-                "Tamanhos, quantidades e valores \n\n" +
-                "Após a conferência e aprovação dos dados, o prazo de produção começará a contar somente a partir do pagamento de, no mínimo, 50% do valor total do pedido.\n\n" +
-                "Qualquer ajuste deve ser informado antes da confirmação do pagamento, para evitar erros na produção."
-            );
+    const confirmacao = confirm(
+        "ATENÇÃO E CONFERÊNCIA:\n\n" +
+        "Pedimos que confira com bastante atenção todas as informações do pedido, especialmente:\n" +
+        "Nomes (ortografia e acentuação)\n" +
+        "Tamanhos, quantidades e valores \n\n" +
+        "Após a conferência e aprovação dos dados, o prazo de produção começará a contar somente a partir do pagamento de, no mínimo, 50% do valor total do pedido.\n\n" +
+        "Qualquer ajuste deve ser informado antes da confirmação do pagamento, para evitar erros na produção."
+    );
 
-            if (confirmacao) {
-                generateExcel(phone);
-            }
-        }
+    if (confirmacao) {
+        generateExcel(phone);
+    }
+}
 
-        function generateExcel(clientPhone) {
-            // Preparar dados
-            const data = cart.map(item => ({
-                "Escrita da Estampa": item.estampa,
-                "Produto": item.produto,
-                "Tamanho": item.tamanho,
-                "Qtd": item.quantidade,
-                "Vlr Unit": item.precoUnit.toFixed(2),
-                "Subtotal": item.total.toFixed(2)
-            }));
+function generateExcel(clientPhone) {
+    const data = cart.map(item => ({
+        "Escrita da Estampa": item.estampa,
+        "Produto": item.produto,
+        "Tamanho": item.tamanho,
+        "Qtd": item.quantidade,
+        "Vlr Unit": item.precoUnit.toFixed(2),
+        "Subtotal": item.total.toFixed(2)
+    }));
 
-            // Criar planilha
-            const worksheet = XLSX.utils.json_to_sheet(data);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Pedido");
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Pedido");
 
-            // Gerar arquivo e baixar
-            const fileName = `Pedido_${clientPhone.replace(/\D/g,'')}.xlsx`;
-            XLSX.writeFile(workbook, fileName);
+    const fileName = `Pedido_${clientPhone.replace(/\D/g,'')}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
 
-            // Abrir WhatsApp com aviso
-            setTimeout(() => {
-                const msg = encodeURIComponent(`Olá! Estou enviando meu pedido (Telefone: ${clientPhone}). A planilha com os detalhes foi gerada e baixada. Vou anexá-la a seguir.`);
-                window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, '_blank');
-            }, 1500);
-        }
+    setTimeout(() => {
+        const msg = encodeURIComponent(`Olá! Estou enviando meu pedido (Telefone: ${clientPhone}). A planilha com os detalhes foi gerada e baixada. Vou anexá-la a seguir.`);
+        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, '_blank');
+    }, 1500);
+}
 
-        init();
+init();
