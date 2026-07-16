@@ -46,75 +46,6 @@ function setStoredAdminHash(hash) {
     localStorage.setItem('admin_pass_hash', hash);
 }
 
-function setStoredRecoveryHash(hash) {
-    localStorage.setItem('admin_recovery_hash', hash);
-}
-
-function getStoredRecoveryHash() {
-    return localStorage.getItem('admin_recovery_hash') || null;
-}
-
-// --- Admin email helpers ---
-function getAdminEmail() {
-    return localStorage.getItem('admin_email') || '';
-}
-
-function setAdminEmail(email) {
-    localStorage.setItem('admin_email', email);
-    const disp = document.getElementById('admin-email-display');
-    if (disp) disp.textContent = email ? 'E-mail salvo: ' + email : '';
-}
-
-function saveAdminEmail() {
-    const el = document.getElementById('admin-email');
-    if (!el) return;
-    const email = el.value.trim();
-    if (!email) return alert('Informe um e-mail válido.');
-    setAdminEmail(email);
-    alert('E-mail salvo. Códigos de recuperação poderão ser enviados para esse endereço.');
-}
-
-function updateAdminEmailDisplay() {
-    const email = getAdminEmail();
-    const disp = document.getElementById('admin-email-display');
-    const input = document.getElementById('admin-email');
-    if (disp) disp.textContent = email ? 'E-mail salvo: ' + email : '';
-    if (input) input.value = email || '';
-}
-
-async function generateRecoveryCode() {
-    const arr = new Uint8Array(16);
-    crypto.getRandomValues(arr);
-    const code = Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
-    const hash = await sha256(code);
-    setStoredRecoveryHash(hash);
-    try { sessionStorage.setItem('admin_recovery_code_plain', code); } catch (e) {}
-    const display = document.getElementById('recovery-code-display');
-    if (display) display.textContent = 'Código de recuperação gerado. Use "Enviar código por e-mail" ou copie-o: ' + code;
-}
-
-function sendRecoveryEmail() {
-    const email = getAdminEmail();
-    if (!email) return alert('Nenhum e-mail salvo. Cadastre um e-mail no painel administrativo.');
-    const code = sessionStorage.getItem('admin_recovery_code_plain');
-    if (!code) return alert('Nenhum código gerado. Gere um código antes de enviar.');
-    const subject = encodeURIComponent('Código de recuperação - PAPA MIKE');
-    const body = encodeURIComponent(`Olá,\n\nSegue o código de recuperação da senha administrativa:\n\n${code}\n\nUse este código na tela de recuperação para definir uma nova senha.\n\nSe você não solicitou este código, ignore esta mensagem.`);
-    const mailto = `mailto:${email}?subject=${subject}&body=${body}`;
-    window.open(mailto, '_blank');
-}
-
-async function recoverWithCode(code, newPass) {
-    const hash = await sha256(code);
-    const stored = getStoredRecoveryHash();
-    if (!stored) { alert('Nenhum código de recuperação registrado.'); return false; }
-    if (hash !== stored) { alert('Código de recuperação inválido.'); return false; }
-    const newHash = await sha256(newPass);
-    setStoredAdminHash(newHash);
-    setStoredRecoveryHash('');
-    return true;
-}
-
 async function changeAdminPassword() {
     const current = document.getElementById('current-pass').value.trim();
     const np = document.getElementById('new-pass').value.trim();
@@ -213,6 +144,23 @@ function init() {
         renderAdminList();
     }
     renderCart();
+
+    const productsTab = document.getElementById('admin-tab-products');
+    const securityTab = document.getElementById('admin-tab-security');
+    if (productsTab && securityTab) {
+        productsTab.addEventListener('click', () => activateAdminTab('products'));
+        securityTab.addEventListener('click', () => activateAdminTab('security'));
+    }
+    // Sanitiza e limita o campo de telefone para 9 dígitos
+    const phoneInput = document.getElementById('contact-phone');
+    if (phoneInput) {
+        phoneInput.setAttribute('maxlength', '9');
+        phoneInput.setAttribute('inputmode', 'numeric');
+        phoneInput.addEventListener('input', (e) => {
+            const cleaned = e.target.value.replace(/\D/g, '').slice(0, 9);
+            if (e.target.value !== cleaned) e.target.value = cleaned;
+        });
+    }
 }
 
 // --- Gestão de Produtos (Admin) ---
@@ -244,7 +192,34 @@ async function loginAdmin() {
     document.getElementById('admin-content-pane').classList.remove('hidden');
     document.getElementById('modal-admin').classList.remove('hidden');
     setAdminModeHint();
+    activateAdminTab('products');
     renderAdminList();
+}
+
+function activateAdminTab(tab) {
+    const productsTab = document.getElementById('admin-tab-products');
+    const securityTab = document.getElementById('admin-tab-security');
+    const productsPanel = document.getElementById('admin-tab-products-panel');
+    const securityPanel = document.getElementById('admin-tab-security-panel');
+    if (!productsTab || !securityTab || !productsPanel || !securityPanel) return;
+
+    const isProducts = tab === 'products';
+    productsTab.classList.toggle('text-blue-500', isProducts);
+    productsTab.classList.toggle('border-b-2', isProducts);
+    productsTab.classList.toggle('border-blue-500', isProducts);
+    productsTab.classList.toggle('text-gray-400', !isProducts);
+    productsTab.classList.toggle('hover:text-white', !isProducts);
+    productsTab.setAttribute('aria-selected', isProducts.toString());
+
+    securityTab.classList.toggle('text-blue-500', !isProducts);
+    securityTab.classList.toggle('border-b-2', !isProducts);
+    securityTab.classList.toggle('border-blue-500', !isProducts);
+    securityTab.classList.toggle('text-gray-400', isProducts);
+    securityTab.classList.toggle('hover:text-white', isProducts);
+    securityTab.setAttribute('aria-selected', (!isProducts).toString());
+
+    productsPanel.classList.toggle('hidden', !isProducts);
+    securityPanel.classList.toggle('hidden', isProducts);
 }
 
 function openAdmin() {
@@ -252,7 +227,6 @@ function openAdmin() {
     document.getElementById('admin-login-pane').classList.remove('hidden');
     document.getElementById('admin-content-pane').classList.add('hidden');
     document.getElementById('admin-login-error').classList.add('hidden');
-    updateAdminEmailDisplay();
 }
 
 function logoutAdmin() {
@@ -388,8 +362,9 @@ function renderCart() {
 
 // --- Envio e Excel ---
 function preSendCheck() {
-    const phone = document.getElementById('contact-phone').value;
-    if (!phone) return alert("Por favor, informe o telefone de contato.");
+    const raw = document.getElementById('contact-phone').value;
+    const phone = raw.replace(/\D/g, '');
+    if (!phone || phone.length !== 9) return alert("Por favor, informe o telefone de contato com 9 dígitos.");
     if (cart.length === 0) return alert("Sua lista está vazia.");
 
     const confirmacao = confirm(
