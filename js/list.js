@@ -381,7 +381,37 @@ function preSendCheck() {
     }
 }
 
-function generateExcel(clientPhone) {
+async function sendViaSupabaseAndWhatsapp(workbook, clientPhone) {
+    if (!SUPABASE_CLIENT) {
+        throw new Error('Supabase não está configurado corretamente.');
+    }
+
+    const fileName = `tabela_${Date.now()}.xlsx`;
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const arquivoBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+    const { data: uploadData, error: uploadError } = await SUPABASE_CLIENT.storage
+        .from('tabelas')
+        .upload(fileName, arquivoBlob);
+
+    if (uploadError) {
+        throw uploadError;
+    }
+
+    const { data: publicData, error: publicError } = SUPABASE_CLIENT.storage
+        .from('tabelas')
+        .getPublicUrl(fileName);
+
+    if (publicError || !publicData?.publicUrl) {
+        throw publicError || new Error('Falha ao gerar link público do arquivo.');
+    }
+
+    const numeroEmpresa = WHATSAPP_NUMBER.replace(/\D/g, '');
+    const textoMensagem = `Olá! Acabei de concluir minha tabela dinâmica. Você pode baixar o arquivo Excel clicando no link abaixo:\n\n🔗 ${publicData.publicUrl}`;
+    window.open(`https://wa.me/${+5551992526332}?text=${encodeURIComponent(textoMensagem)}`, '_blank');
+}
+
+async function generateExcel(clientPhone) {
     const data = cart.map(item => ({
         "Escrita da Estampa": item.estampa,
         "Produto": item.produto,
@@ -395,13 +425,13 @@ function generateExcel(clientPhone) {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Pedido");
 
-    const fileName = `Pedido_${clientPhone.replace(/\D/g,'')}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
-
-    setTimeout(() => {
-        const msg = encodeURIComponent(`Olá! Estou enviando meu pedido (Telefone: ${clientPhone}). A planilha com os detalhes foi gerada e baixada. Vou anexá-la a seguir.`);
-        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, '_blank');
-    }, 1500);
+    try {
+        await sendViaSupabaseAndWhatsapp(workbook, clientPhone);
+        alert('A tabela foi enviada ao WhatsApp da empresa com link público do Supabase.');
+    } catch (err) {
+        console.error('Erro ao enviar tabela via Supabase:', err);
+        alert('Falha ao enviar a tabela: ' + (err.message || err));
+    }
 }
 
 init();

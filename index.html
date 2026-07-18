@@ -10,11 +10,11 @@
     <link rel="stylesheet" href="css/main.css">
         <style>
             /* Logo: evitar esticamento — largura limitada, altura automática */
-            .logo-wrapper{display:flex;align-items:center;justify-content:center;padding:6px 0}
+            .logo-wrapper{display:flex;align-items:center;justify-content:center;padding:10px 0}
             /* Ícone pequeno */
-            .logo-img{width:48px;max-width:48px;height:auto;max-height:48px;object-fit:contain;display:block}
+            .logo-img{width:110px;max-width:110px;height:auto;max-height:58px;object-fit:contain;display:block}
             /* Logo fora do card (tamanho solicitado) */
-            .logo-outside{width:160px;height:160px;object-fit:contain;display:block}
+            .logo-outside{width:100px;height:140px;object-fit:contain;display:block}
 
             /* Fallback imediato para as classes Tailwind do <body> */
             body{
@@ -38,7 +38,7 @@
 <body class="min-h-screen text-slate-100 p-4 md:py-8 flex flex-col items-center justify-start bg-slate-950 font-sans selection:bg-emerald-500 selection:text-slate-950">
     <main class="w-full max-w-xl">
         <div class="flex justify-center mb-4">
-            <img src="img/papamike logo.png" alt="Logo PAPA MIKE" class="logo-outside rounded-3xl shadow-2xl border border-white/10">
+            <img src="img/papamike logo.jpeg" alt="Logo PAPA MIKE" class="logo-outside rounded-3xl shadow-3xl border border-white/10">
         </div>
         <div class="rounded-3xl p-6 shadow-2xl border border-white/10 panel-bg">
             
@@ -148,6 +148,7 @@
                 </div>
             </div>
 
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
         <script src="js/supabase-config.js"></script>
         <script src="js/list.js"></script>
 </body>
