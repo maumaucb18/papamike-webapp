@@ -46,6 +46,75 @@ function setStoredAdminHash(hash) {
     localStorage.setItem('admin_pass_hash', hash);
 }
 
+function setStoredRecoveryHash(hash) {
+    localStorage.setItem('admin_recovery_hash', hash);
+}
+
+function getStoredRecoveryHash() {
+    return localStorage.getItem('admin_recovery_hash') || null;
+}
+
+// --- Admin email helpers ---
+function getAdminEmail() {
+    return localStorage.getItem('admin_email') || '';
+}
+
+function setAdminEmail(email) {
+    localStorage.setItem('admin_email', email);
+    const disp = document.getElementById('admin-email-display');
+    if (disp) disp.textContent = email ? 'E-mail salvo: ' + email : '';
+}
+
+function saveAdminEmail() {
+    const el = document.getElementById('admin-email');
+    if (!el) return;
+    const email = el.value.trim();
+    if (!email) return alert('Informe um e-mail válido.');
+    setAdminEmail(email);
+    alert('E-mail salvo. Códigos de recuperação poderão ser enviados para esse endereço.');
+}
+
+function updateAdminEmailDisplay() {
+    const email = getAdminEmail();
+    const disp = document.getElementById('admin-email-display');
+    const input = document.getElementById('admin-email');
+    if (disp) disp.textContent = email ? 'E-mail salvo: ' + email : '';
+    if (input) input.value = email || '';
+}
+
+async function generateRecoveryCode() {
+    const arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    const code = Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
+    const hash = await sha256(code);
+    setStoredRecoveryHash(hash);
+    try { sessionStorage.setItem('admin_recovery_code_plain', code); } catch (e) {}
+    const display = document.getElementById('recovery-code-display');
+    if (display) display.textContent = 'Código de recuperação gerado. Use "Enviar código por e-mail" ou copie-o: ' + code;
+}
+
+function sendRecoveryEmail() {
+    const email = getAdminEmail();
+    if (!email) return alert('Nenhum e-mail salvo. Cadastre um e-mail no painel administrativo.');
+    const code = sessionStorage.getItem('admin_recovery_code_plain');
+    if (!code) return alert('Nenhum código gerado. Gere um código antes de enviar.');
+    const subject = encodeURIComponent('Código de recuperação - PAPA MIKE');
+    const body = encodeURIComponent(`Olá,\n\nSegue o código de recuperação da senha administrativa:\n\n${code}\n\nUse este código na tela de recuperação para definir uma nova senha.\n\nSe você não solicitou este código, ignore esta mensagem.`);
+    const mailto = `mailto:${email}?subject=${subject}&body=${body}`;
+    window.open(mailto, '_blank');
+}
+
+async function recoverWithCode(code, newPass) {
+    const hash = await sha256(code);
+    const stored = getStoredRecoveryHash();
+    if (!stored) { alert('Nenhum código de recuperação registrado.'); return false; }
+    if (hash !== stored) { alert('Código de recuperação inválido.'); return false; }
+    const newHash = await sha256(newPass);
+    setStoredAdminHash(newHash);
+    setStoredRecoveryHash('');
+    return true;
+}
+
 async function changeAdminPassword() {
     const current = document.getElementById('current-pass').value.trim();
     const np = document.getElementById('new-pass').value.trim();
@@ -144,23 +213,6 @@ function init() {
         renderAdminList();
     }
     renderCart();
-
-    const productsTab = document.getElementById('admin-tab-products');
-    const securityTab = document.getElementById('admin-tab-security');
-    if (productsTab && securityTab) {
-        productsTab.addEventListener('click', () => activateAdminTab('products'));
-        securityTab.addEventListener('click', () => activateAdminTab('security'));
-    }
-    // Sanitiza e limita o campo de telefone para 11 dígitos
-    const phoneInput = document.getElementById('contact-phone');
-    if (phoneInput) {
-        phoneInput.setAttribute('maxlength', '11');
-        phoneInput.setAttribute('inputmode', 'numeric');
-        phoneInput.addEventListener('input', (e) => {
-            const cleaned = e.target.value.replace(/\D/g, '').slice(0, 11);
-            if (e.target.value !== cleaned) e.target.value = cleaned;
-        });
-    }
 }
 
 // --- Gestão de Produtos (Admin) ---
@@ -192,34 +244,7 @@ async function loginAdmin() {
     document.getElementById('admin-content-pane').classList.remove('hidden');
     document.getElementById('modal-admin').classList.remove('hidden');
     setAdminModeHint();
-    activateAdminTab('products');
     renderAdminList();
-}
-
-function activateAdminTab(tab) {
-    const productsTab = document.getElementById('admin-tab-products');
-    const securityTab = document.getElementById('admin-tab-security');
-    const productsPanel = document.getElementById('admin-tab-products-panel');
-    const securityPanel = document.getElementById('admin-tab-security-panel');
-    if (!productsTab || !securityTab || !productsPanel || !securityPanel) return;
-
-    const isProducts = tab === 'products';
-    productsTab.classList.toggle('text-blue-500', isProducts);
-    productsTab.classList.toggle('border-b-2', isProducts);
-    productsTab.classList.toggle('border-blue-500', isProducts);
-    productsTab.classList.toggle('text-gray-400', !isProducts);
-    productsTab.classList.toggle('hover:text-white', !isProducts);
-    productsTab.setAttribute('aria-selected', isProducts.toString());
-
-    securityTab.classList.toggle('text-blue-500', !isProducts);
-    securityTab.classList.toggle('border-b-2', !isProducts);
-    securityTab.classList.toggle('border-blue-500', !isProducts);
-    securityTab.classList.toggle('text-gray-400', isProducts);
-    securityTab.classList.toggle('hover:text-white', isProducts);
-    securityTab.setAttribute('aria-selected', (!isProducts).toString());
-
-    productsPanel.classList.toggle('hidden', !isProducts);
-    securityPanel.classList.toggle('hidden', isProducts);
 }
 
 function openAdmin() {
@@ -227,6 +252,7 @@ function openAdmin() {
     document.getElementById('admin-login-pane').classList.remove('hidden');
     document.getElementById('admin-content-pane').classList.add('hidden');
     document.getElementById('admin-login-error').classList.add('hidden');
+    updateAdminEmailDisplay();
 }
 
 function logoutAdmin() {
@@ -362,9 +388,8 @@ function renderCart() {
 
 // --- Envio e Excel ---
 function preSendCheck() {
-    const raw = document.getElementById('contact-phone').value;
-    const phone = raw.replace(/\D/g, '');
-    if (!phone || phone.length !== 11) return alert("Por favor, informe o telefone de contato com 11 dígitos.");
+    const phone = document.getElementById('contact-phone').value;
+    if (!phone) return alert("Por favor, informe o telefone de contato.");
     if (cart.length === 0) return alert("Sua lista está vazia.");
 
     const confirmacao = confirm(
@@ -381,43 +406,8 @@ function preSendCheck() {
     }
 }
 
-async function sendViaSupabaseAndWhatsapp(workbook, clientPhone) {
-    if (!SUPABASE_CLIENT) {
-        throw new Error('Supabase não está configurado corretamente.');
-    }
-
-    // nome do arquivo usando o telefone do cliente (apenas dígitos)
-    const sanitizedPhone = String(clientPhone).replace(/\D/g, '') || String(Date.now());
-    const fileName = `tabela_${sanitizedPhone}.xlsx`;
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const arquivoBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-
-    // Se já existir um arquivo com o mesmo nome e desejar sobrescrever, use { upsert: true }
-    const { data: uploadData, error: uploadError } = await SUPABASE_CLIENT.storage
-        .from('tabelas')
-        .upload(fileName, arquivoBlob, { upsert: true });
-
-    if (uploadError) {
-        throw uploadError;
-    }
-
-    const { data: publicData, error: publicError } = SUPABASE_CLIENT.storage
-        .from('tabelas')
-        .getPublicUrl(fileName);
-
-    if (publicError || !publicData?.publicUrl) {
-        throw publicError || new Error('Falha ao gerar link público do arquivo.');
-    }
-
-    const numeroEmpresa = WHATSAPP_NUMBER.replace(/\D/g, '');
-    const textoMensagem = `Olá! Acabei de concluir minha lista de pedidos (telefone do cliente: ${sanitizedPhone}). Você pode baixar o arquivo Excel clicando no link abaixo:\n\n🔗 ${publicData.publicUrl}`;
-    window.open(`https://wa.me/${numeroEmpresa}?text=${encodeURIComponent(textoMensagem)}`, '_blank');
-}
-
-async function generateExcel(clientPhone) {
-    const sanitizedPhone = String(clientPhone).replace(/\D/g, '');
+function generateExcel(clientPhone) {
     const data = cart.map(item => ({
-        "Telefone Cliente": sanitizedPhone,
         "Escrita da Estampa": item.estampa,
         "Produto": item.produto,
         "Tamanho": item.tamanho,
@@ -430,13 +420,13 @@ async function generateExcel(clientPhone) {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Pedido");
 
-    try {
-        await sendViaSupabaseAndWhatsapp(workbook, clientPhone);
-        alert('A tabela foi enviada ao WhatsApp da empresa');
-    } catch (err) {
-        console.error('Erro ao enviar tabela via Supabase:', err);
-        alert('Falha ao enviar a tabela: ' + (err.message || err));
-    }
+    const fileName = `Pedido_${clientPhone.replace(/\D/g,'')}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+
+    setTimeout(() => {
+        const msg = encodeURIComponent(`Olá! Estou enviando meu pedido (Telefone: ${clientPhone}). A planilha com os detalhes foi gerada e baixada. Vou anexá-la a seguir.`);
+        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, '_blank');
+    }, 1500);
 }
 
 init();

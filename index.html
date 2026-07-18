@@ -10,11 +10,11 @@
     <link rel="stylesheet" href="css/main.css">
         <style>
             /* Logo: evitar esticamento — largura limitada, altura automática */
-            .logo-wrapper{display:flex;align-items:center;justify-content:center;padding:10px 0}
+            .logo-wrapper{display:flex;align-items:center;justify-content:center;padding:6px 0}
             /* Ícone pequeno */
-            .logo-img{width:110px;max-width:110px;height:auto;max-height:58px;object-fit:contain;display:block}
+            .logo-img{width:48px;max-width:48px;height:auto;max-height:48px;object-fit:contain;display:block}
             /* Logo fora do card (tamanho solicitado) */
-            .logo-outside{width:100px;height:140px;object-fit:contain;display:block}
+            .logo-outside{width:160px;height:160px;object-fit:contain;display:block}
 
             /* Fallback imediato para as classes Tailwind do <body> */
             body{
@@ -38,7 +38,7 @@
 <body class="min-h-screen text-slate-100 p-4 md:py-8 flex flex-col items-center justify-start bg-slate-950 font-sans selection:bg-emerald-500 selection:text-slate-950">
     <main class="w-full max-w-xl">
         <div class="flex justify-center mb-4">
-            <img src="img/papamike logo.jpeg" alt="Logo PAPA MIKE" class="logo-outside rounded-3xl shadow-3xl border border-white/10">
+            <img src="img/papamike logo.png" alt="Logo PAPA MIKE" class="logo-outside rounded-3xl shadow-2xl border border-white/10">
         </div>
         <div class="rounded-3xl p-6 shadow-2xl border border-white/10 panel-bg">
             
@@ -54,10 +54,10 @@
             </div>
             <div id="supabase-status" class="mb-2 text-sm text-gray-300 hidden"></div>
             
-            <!-- Telefone Contato (limitado a 11 dígitos) -->
+            <!-- Telefone Contato -->
             <div class="mb-4">
                 <label class="block mb-1 font-medium text-gray-300 text-xs uppercase">Telefone do Cliente (Obrigatório)</label>
-                <input id="contact-phone" class="w-full rounded-lg px-3 py-2 bg-black/40 text-white border border-white/20 focus:ring-2 focus:ring-gray-400 outline-none" type="tel" inputmode="numeric" pattern="\\d{11}" maxlength="11" placeholder="(99) 99999-9999">
+                <input id="contact-phone" class="w-full rounded-lg px-3 py-2 bg-black/40 text-white border border-white/20 focus:ring-2 focus:ring-gray-400 outline-none" type="tel" placeholder="(00) 00000-0000">
             </div>
 
             <form id="order-form" class="space-y-4">
@@ -81,7 +81,7 @@
                         </select>
                     </div>
                     <div>
-                        <label for="input-qty" class="block mb-1 font-medium text-white text-xs uppercase">Quantidade</label>
+                        <label for="input-qty" class="block mb-1 font-medium text-white text-xs uppercase">Qtd</label>
                         <input id="input-qty" type="number" value="1" min="1" class="w-full rounded-lg px-3 py-2 border border-white/30 bg-white/10 text-white outline-none">
                     </div>
                 </div>
@@ -102,54 +102,56 @@
 
     <!-- Modal Admin -->
     <div id="modal-admin" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4 z-50">
-      <div class="w-full max-w-xl max-h-[90vh] overflow-hidden rounded-2xl border border-white/20 bg-gray-900 shadow-2xl">
-        <div class="h-full overflow-y-auto p-6">
-          <h2 class="text-white font-bold text-xl mb-4 text-center">Área Administrativa</h2>
-          <div id="admin-login-pane" class="space-y-3">
-            <input id="admin-password" type="password" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Senha administrativa">
-            <div id="admin-login-error" class="text-xs text-red-400 hidden"></div>
-            <button onclick="loginAdmin()" class="w-full bg-blue-600 text-white py-2 rounded font-bold">Entrar</button>
-          </div>
-          <div id="admin-content-pane" class="hidden">
-            <div id="admin-mode" class="mb-4 text-xs text-gray-400"></div>
-
-            <div role="tablist" class="mb-4 flex flex-wrap gap-2 rounded-full bg-white/5 p-1">
-              <button id="admin-tab-products" type="button" role="tab" aria-selected="true" class="px-4 py-2 rounded-full text-blue-500 border-b-2 border-blue-500 transition-colors">Produtos</button>
-              <button id="admin-tab-security" type="button" role="tab" aria-selected="false" class="px-4 py-2 rounded-full text-gray-400 hover:text-white transition-colors">Segurança</button>
-            </div>
-
-            <div id="admin-tab-products-panel" class="space-y-3">
-              <div class="space-y-3">
-                <input id="new-prod-name" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Nome do Produto">
-                <input id="new-prod-price" type="number" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Preço (Ex: 55.00)">
-                <button onclick="saveProduct()" class="w-full bg-blue-600 text-white py-2 rounded font-bold">Adicionar Produto</button>
-              </div>
-
-              <div class="mt-4 rounded-lg border border-white/10 bg-white/5 p-3">
-                <div class="text-sm text-gray-300 font-semibold mb-2">Produtos cadastrados</div>
-                <div id="admin-prod-list" class="max-h-40 overflow-y-auto text-sm text-white space-y-2"></div>
-              </div>
-            </div>
-
-                        <div id="admin-tab-security-panel" class="hidden space-y-4">
-                            <div class="space-y-3 rounded-lg border border-white/10 bg-white/5 p-3">
-                                <div class="text-sm text-white font-semibold">Segurança</div>
-                                <div class="text-xs text-gray-300">Altere a senha administrativa</div>
-                                <input id="current-pass" type="password" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Senha atual">
-                                <input id="new-pass" type="password" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Nova senha">
-                                <input id="confirm-pass" type="password" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Confirme a nova senha">
-                                <button onclick="changeAdminPassword()" class="w-full bg-blue-600 text-white py-2 rounded font-bold">Alterar senha</button>
-                            </div>
-
-                            <button onclick="logoutAdmin()" class="w-full mt-4 bg-red-600 text-white py-2 rounded font-bold">Sair</button>
-                        </div>
-                    </div>
-                    <button onclick="closeAdmin()" class="w-full mt-4 text-gray-400 text-sm">Fechar</button>
+        <div class="bg-gray-900 border border-white/20 p-6 rounded-2xl w-full max-w-sm">
+            <h2 class="text-white font-bold text-xl mb-4 text-center">Área Administrativa</h2>
+            <div id="admin-login-pane" class="space-y-3">
+                <input id="admin-password" type="password" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Senha administrativa">
+                <div id="admin-login-error" class="text-xs text-red-400 hidden"></div>
+                <div class="flex gap-2">
+                    <button onclick="loginAdmin()" class="flex-1 bg-blue-600 text-white py-2 rounded font-bold">Entrar</button>
+                    <button onclick="openRecovery()" class="flex-1 bg-amber-500 text-black py-2 rounded font-bold">Recuperar</button>
                 </div>
             </div>
+            <div id="admin-content-pane" class="hidden">
+                <div id="admin-mode" class="mb-3 text-xs text-gray-400"></div>
+                <div class="space-y-3">
+                    <input id="new-prod-name" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Nome do Produto">
+                    <input id="new-prod-price" type="number" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Preço (Ex: 55.00)">
+                    <button onclick="saveProduct()" class="w-full bg-blue-600 text-white py-2 rounded font-bold">Adicionar Produto</button>
+                </div>
+                <div class="mt-4 border-t border-white/10 pt-3 space-y-3">
+                    <h3 class="text-sm text-white font-bold">Segurança</h3>
+                    <div class="text-xs text-gray-300">Alterar senha administrativa</div>
+                    <input id="current-pass" type="password" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Senha atual">
+                    <input id="new-pass" type="password" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Nova senha">
+                    <input id="confirm-pass" type="password" class="w-full rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="Confirme a nova senha">
+                    <button onclick="changeAdminPassword()" class="w-full bg-emerald-500 text-black py-2 rounded font-bold">Alterar senha</button>
 
-        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
-        <script src="js/supabase-config.js"></script>
-        <script src="js/list.js"></script>
+                    <div class="pt-2">
+                        <div class="text-xs text-gray-300">E-mail administrativo (usado para recuperação)</div>
+                        <div class="flex gap-2">
+                            <input id="admin-email" type="email" class="flex-1 rounded px-3 py-2 bg-gray-800 text-white border border-white/10" placeholder="seu@email.com">
+                            <button onclick="saveAdminEmail()" class="bg-blue-600 text-white px-3 rounded font-bold">Salvar</button>
+                        </div>
+                        <div id="admin-email-display" class="text-xs text-gray-400 mt-1"></div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button id="gen-recovery-btn" onclick="generateRecoveryCode()" class="w-full bg-gray-700 text-white py-2 rounded font-bold">Gerar código de recuperação</button>
+                        <button id="send-recovery-email-btn" onclick="sendRecoveryEmail()" class="w-full mt-2 bg-emerald-500 text-black py-2 rounded font-bold">Enviar código por e-mail</button>
+                        <div id="recovery-code-display" class="mt-2 text-xs text-gray-300 break-words"></div>
+                    </div>
+                </div>
+                <div id="admin-prod-list" class="mt-4 max-h-40 overflow-y-auto border-t border-white/10 pt-2 text-sm text-white">
+                    <!-- Lista de exclusão -->
+                </div>
+                <button onclick="logoutAdmin()" class="w-full mt-4 bg-red-600 text-white py-2 rounded font-bold">Sair</button>
+            </div>
+            <button onclick="closeAdmin()" class="w-full mt-4 text-gray-400 text-sm">Fechar</button>
+        </div>
+    </div>
+
+    <script src="js/supabase-config.js"></script>
+    <script src="js/list.js"></script>
 </body>
 </html>
