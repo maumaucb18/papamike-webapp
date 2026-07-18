@@ -10,7 +10,45 @@ let products = JSON.parse(localStorage.getItem('products')) || [
 
 let cart = [];
 
+const DEFAULT_SIZE_RATES = [
+    { tamanho: 'P', acrescimo: 0 },
+    { tamanho: 'M', acrescimo: 0 },
+    { tamanho: 'G', acrescimo: 0 },
+    { tamanho: 'GG', acrescimo: 0 },
+    { tamanho: 'G1', acrescimo: 15 },
+    { tamanho: 'G2', acrescimo: 20 }
+];
+
+let sizeRates = loadSizeRatesFromStorage();
+
 const usingSupabase = typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL && typeof SUPABASE_ANON_KEY !== 'undefined' && SUPABASE_ANON_KEY;
+
+function loadSizeRatesFromStorage() {
+    try {
+        const saved = JSON.parse(localStorage.getItem('size-rates'));
+        if (Array.isArray(saved) && saved.length) {
+            return saved.map(rate => ({ tamanho: rate.tamanho, acrescimo: parseFloat(rate.acrescimo) || 0 }));
+        }
+    } catch (e) {}
+    return DEFAULT_SIZE_RATES.map(rate => ({ ...rate }));
+}
+
+function saveSizeRatesToStorage() {
+    localStorage.setItem('size-rates', JSON.stringify(sizeRates));
+}
+
+function getSizeRate(tamanho) {
+    const rate = sizeRates.find(item => item.tamanho === tamanho);
+    return rate ? parseFloat(rate.acrescimo) : 0;
+}
+
+function calculateItemPrice(productPrice, size) {
+    return parseFloat(productPrice) + getSizeRate(size);
+}
+
+function formatCurrency(value) {
+    return `R$ ${parseFloat(value || 0).toFixed(2).replace('.', ',')}`;
+}
 
 function setStatus(message, type = 'info') {
     const status = document.getElementById('supabase-status');
@@ -135,9 +173,11 @@ async function changeAdminPassword() {
 function refreshProducts() {
     if (usingSupabase) {
         fetchProductsFromSupabase();
+        fetchSizeRatesFromSupabase();
     } else {
         renderProducts();
         renderAdminList();
+        renderSizeRateControls();
         setStatus('Atualizado a partir do localStorage.', 'success');
     }
 }
@@ -174,6 +214,32 @@ async function fetchProductsFromSupabase() {
     }
 }
 
+async function fetchSizeRatesFromSupabase() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/taxas_tamanho?select=*`, {
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+            }
+        });
+
+        if (!res.ok) {
+            throw new Error('Tabela de taxas não disponível ainda.');
+        }
+
+        const data = await res.json();
+        sizeRates = data.length
+            ? data.map(rate => ({ tamanho: rate.tamanho, acrescimo: parseFloat(rate.acrescimo) || 0 }))
+            : DEFAULT_SIZE_RATES.map(rate => ({ ...rate }));
+        saveSizeRatesToStorage();
+        renderSizeRateControls();
+    } catch (err) {
+        console.warn('Não foi possível carregar as taxas por tamanho:', err);
+        sizeRates = loadSizeRatesFromStorage();
+        renderSizeRateControls();
+    }
+}
+
 async function addProductToSupabase(name, price) {
     const body = [{ name, price }];
     const res = await fetch(`${SUPABASE_URL}/rest/v1/products`, {
@@ -203,14 +269,16 @@ async function deleteProductFromSupabase(id) {
 }
 
 // --- Inicialização ---
-function init() {
+async function init() {
     setAdminModeHint();
     setStatus('', 'hidden');
     if (usingSupabase) {
-        fetchProductsFromSupabase();
+        await Promise.all([fetchProductsFromSupabase(), fetchSizeRatesFromSupabase()]);
     } else {
+        sizeRates = loadSizeRatesFromStorage();
         renderProducts();
         renderAdminList();
+        renderSizeRateControls();
     }
     renderCart();
 }
@@ -248,7 +316,9 @@ async function loginAdmin() {
 }
 
 function openAdmin() {
-    document.getElementById('modal-admin').classList.remove('hidden');
+    const modal = document.getElementById('modal-admin');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
     document.getElementById('admin-login-pane').classList.remove('hidden');
     document.getElementById('admin-content-pane').classList.add('hidden');
     document.getElementById('admin-login-error').classList.add('hidden');
@@ -262,7 +332,9 @@ function logoutAdmin() {
 }
 
 function closeAdmin() {
-    document.getElementById('modal-admin').classList.add('hidden');
+    const modal = document.getElementById('modal-admin');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
 }
 
 async function saveProduct() {
@@ -334,6 +406,85 @@ function renderAdminList() {
     `).join('');
 }
 
+function renderSizeRateControls() {
+    const container = document.getElementById('size-rate-controls');
+    if (!container) return;
+    container.innerHTML = sizeRates.map(rate => `
+        <div class="flex items-center gap-2">
+            <label class="text-xs uppercase text-gray-400 min-w-[2.2rem]">${rate.tamanho}</label>
+            <input id="size-rate-${rate.tamanho}" type="number" step="0.01" value="${parseFloat(rate.acrescimo).toFixed(2)}" class="flex-1 rounded px-2 py-1 bg-gray-800 text-white border border-white/10 text-sm">
+            <button onclick="saveSizeRate('${rate.tamanho}')" class="bg-emerald-500 text-black px-2 py-1 rounded text-xs font-bold">Salvar</button>
+        </div>
+    `).join('');
+}
+
+async function updateSizeRateInSupabase(tamanho, acrescimo) {
+    const payload = { acrescimo };
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/taxas_tamanho?tamanho=eq.${encodeURIComponent(tamanho)}`, {
+        method: 'PATCH',
+        headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+        throw new Error('Não foi possível salvar a taxa no Supabase.');
+    }
+
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) {
+        const createRes = await fetch(`${SUPABASE_URL}/rest/v1/taxas_tamanho`, {
+            method: 'POST',
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                Prefer: 'return=representation'
+            },
+            body: JSON.stringify([{ tamanho, acrescimo }])
+        });
+        if (!createRes.ok) {
+            throw new Error('Não foi possível criar a taxa no Supabase.');
+        }
+    }
+}
+
+async function saveSizeRate(tamanho) {
+    const input = document.getElementById(`size-rate-${tamanho}`);
+    if (!input) return;
+
+    const novoValor = parseFloat(input.value);
+    if (Number.isNaN(novoValor)) return alert('Valor inválido.');
+
+    const index = sizeRates.findIndex(item => item.tamanho === tamanho);
+    if (index >= 0) {
+        sizeRates[index].acrescimo = novoValor;
+    } else {
+        sizeRates.push({ tamanho, acrescimo: novoValor });
+    }
+
+    saveSizeRatesToStorage();
+
+    if (usingSupabase) {
+        try {
+            await updateSizeRateInSupabase(tamanho, novoValor);
+            setStatus(`Acréscimo do tamanho ${tamanho} salvo no Supabase.`, 'success');
+        } catch (err) {
+            console.error(err);
+            setStatus(`Erro ao salvar ${tamanho}: ${err.message}`, 'error');
+        }
+    } else {
+        setStatus(`Acréscimo do tamanho ${tamanho} salvo localmente.`, 'success');
+    }
+
+    renderSizeRateControls();
+    renderCart();
+}
+
 // --- Carrinho / Lista ---
 function addToList() {
     const name = document.getElementById('input-name').value;
@@ -343,14 +494,18 @@ function addToList() {
     const product = products.find(p => p.name === prodName);
 
     if (!name) return alert("Preencha a escrita da estampa");
+    if (!product) return alert("Selecione um produto válido.");
+
+    const precoUnit = calculateItemPrice(product.price, size);
 
     cart.push({ 
         estampa: name, 
         produto: prodName, 
         tamanho: size, 
         quantidade: qty,
-        precoUnit: product.price,
-        total: product.price * qty
+        precoBase: product.price,
+        precoUnit,
+        total: precoUnit * qty
     });
 
     renderCart();
@@ -368,15 +523,19 @@ function renderCart() {
     let totalGeral = 0;
     
     container.innerHTML = cart.map((item, i) => {
-        totalGeral += item.total;
+        const precoBase = typeof item.precoBase === 'number' ? item.precoBase : 0;
+        const precoUnit = calculateItemPrice(precoBase, item.tamanho);
+        const totalItem = precoUnit * item.quantidade;
+        totalGeral += totalItem;
+
         return `
         <div class="bg-white/10 rounded-lg p-3 text-white flex justify-between items-center">
             <div>
                 <p class="font-bold text-sm">${item.estampa}</p>
-                <p class="text-xs text-gray-300">${item.quantidade}x ${item.produto} (${item.tamanho})</p>
+                <p class="text-xs text-gray-300">${item.quantidade}x ${item.produto} (${item.tamanho}) • ${formatCurrency(precoUnit)}</p>
             </div>
             <div class="text-right">
-                <p class="text-sm font-bold">R$ ${item.total.toFixed(2)}</p>
+                <p class="text-sm font-bold">${formatCurrency(totalItem)}</p>
                 <button onclick="removeFromCart(${i})" class="text-red-400 text-xs">Remover</button>
             </div>
         </div>
