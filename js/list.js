@@ -386,13 +386,16 @@ async function sendViaSupabaseAndWhatsapp(workbook, clientPhone) {
         throw new Error('Supabase não está configurado corretamente.');
     }
 
-    const fileName = `tabela_${Date.now()}.xlsx`;
+    // nome do arquivo usando o telefone do cliente (apenas dígitos)
+    const sanitizedPhone = String(clientPhone).replace(/\D/g, '') || String(Date.now());
+    const fileName = `tabela_${sanitizedPhone}.xlsx`;
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const arquivoBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 
+    // Se já existir um arquivo com o mesmo nome e desejar sobrescrever, use { upsert: true }
     const { data: uploadData, error: uploadError } = await SUPABASE_CLIENT.storage
         .from('tabelas')
-        .upload(fileName, arquivoBlob);
+        .upload(fileName, arquivoBlob, { upsert: true });
 
     if (uploadError) {
         throw uploadError;
@@ -407,12 +410,14 @@ async function sendViaSupabaseAndWhatsapp(workbook, clientPhone) {
     }
 
     const numeroEmpresa = WHATSAPP_NUMBER.replace(/\D/g, '');
-    const textoMensagem = `Olá! Acabei de concluir minha tabela dinâmica. Você pode baixar o arquivo Excel clicando no link abaixo:\n\n🔗 ${publicData.publicUrl}`;
-    window.open(`https://wa.me/${+5551992526332}?text=${encodeURIComponent(textoMensagem)}`, '_blank');
+    const textoMensagem = `Olá! Acabei de concluir minha lista de pedidos (telefone do cliente: ${sanitizedPhone}). Você pode baixar o arquivo Excel clicando no link abaixo:\n\n🔗 ${publicData.publicUrl}`;
+    window.open(`https://wa.me/${numeroEmpresa}?text=${encodeURIComponent(textoMensagem)}`, '_blank');
 }
 
 async function generateExcel(clientPhone) {
+    const sanitizedPhone = String(clientPhone).replace(/\D/g, '');
     const data = cart.map(item => ({
+        "Telefone Cliente": sanitizedPhone,
         "Escrita da Estampa": item.estampa,
         "Produto": item.produto,
         "Tamanho": item.tamanho,
@@ -427,7 +432,7 @@ async function generateExcel(clientPhone) {
 
     try {
         await sendViaSupabaseAndWhatsapp(workbook, clientPhone);
-        alert('A tabela foi enviada ao WhatsApp da empresa com link público do Supabase.');
+        alert('A tabela foi enviada ao WhatsApp da empresa');
     } catch (err) {
         console.error('Erro ao enviar tabela via Supabase:', err);
         alert('Falha ao enviar a tabela: ' + (err.message || err));
